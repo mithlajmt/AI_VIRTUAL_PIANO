@@ -1,0 +1,8 @@
+﻿
+> ai-finger-piano@0.0.0 build
+> tsc -b && vite build
+
+src/App.tsx(1,1): error TS6133: 'React' is declared but its value is never read.
+src/components/HandTracker.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/HandTracker.tsx(4,46): error TS2307: Cannot find module '@mediapipe/tasks-vision' or its corresponding type declarations.
+src/hooks/useHandTracking.ts(2,71): error TS2307: Cannot find module '@mediapipe/tasks-vision' or its corresponding type declarations.

@@ -1,0 +1,5 @@
+﻿
+> ai-finger-piano@0.0.0 build
+> tsc -b && vite build
+
+src/hooks/useHandTracking.ts(2,43): error TS1484: 'HandLandmarkerResult' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.
