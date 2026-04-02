@@ -11,9 +11,9 @@ export const useHandTracking = () => {
 
     const initModel = async () => {
       try {
-        const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-        );
+        console.log("Initializing MediaPipe Vision...");
+        const vision = await FilesetResolver.forVisionTasks("/wasm");
+        console.log("Vision initialized. Loading landmarker model...");
         
         const landmarker = await HandLandmarker.createFromOptions(vision, {
           baseOptions: {

@@ -25,9 +25,6 @@ export const HandTracker = () => {
   const fingerStatesRef = useRef<Record<string, FingerState>>({});
   const ripplesRef = useRef<Ripple[]>([]);
   const pressedKeysRef = useRef<Set<number>>(new Set());
-  
-  const lastHandSeenTimeRef = useRef<number>(Date.now());
-  const autoPlayPhaseRef = useRef<number>(0);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -133,32 +130,6 @@ export const HandTracker = () => {
             }
           }
 
-          // --- Idle "Show Mode" Logic ---
-          if (allTipsToDraw.length > 0) {
-            lastHandSeenTimeRef.current = Date.now();
-          }
-
-          const isIdle = (Date.now() - lastHandSeenTimeRef.current) > 10000;
-          
-          if (isIdle) {
-            autoPlayPhaseRef.current += 1;
-            // Play a gorgeous automated arpeggio sequence
-            if (autoPlayPhaseRef.current % 35 === 0) {
-              const autoKey = Math.floor(Math.random() * numKeys);
-              synth.playNote(autoKey);
-              pressedKeysRef.current.add(autoKey);
-              
-              const rippleX = autoKey * keyWidth + keyWidth / 2;
-              const rippleY = pianoHeight / 2;
-              
-              ripplesRef.current.push({ x: rippleX, y: rippleY, radius: 10, alpha: 1 });
-              
-              setTimeout(() => {
-                pressedKeysRef.current.delete(autoKey);
-              }, 250);
-            }
-          }
-
           // 2. Draw Piano Keys (Unconditionally)
           for (let i = 0; i < numKeys; i++) {
             const keyX = i * keyWidth;
@@ -167,44 +138,107 @@ export const HandTracker = () => {
             
             ctx.beginPath();
             
-            // Piano-like contiguous keys: tight borders, square top, rounded bottom.
             const pressOffset = isPressed ? 8 : 0;
-            // use a thin 2px gap horizontally.
             ctx.roundRect(
-              keyX + 2 + pressOffset / 2, 
+              keyX + 3, 
               pianoY, 
-              keyWidth - 4 - pressOffset, 
-              pianoHeight - 6 - pressOffset, 
-              [0, 0, 16, 16] 
+              keyWidth - 6, 
+              pianoHeight - 8 + pressOffset, 
+              [0, 0, 14, 14] 
             );
             
+            const grad = ctx.createLinearGradient(0, pianoY, 0, pianoY + pianoHeight);
             if (isPressed) {
-              const grad = ctx.createLinearGradient(0, pianoY, 0, pianoY + pianoHeight);
-              grad.addColorStop(0, 'rgba(52, 211, 153, 0.9)'); // Bright emerald
-              grad.addColorStop(1, 'rgba(16, 185, 129, 0.6)');  // Deep emerald
-              ctx.fillStyle = grad;
-              ctx.shadowColor = '#34d399';
-              ctx.shadowBlur = 40; // Reduced from 60
-            } else if (isHovered) {
-              const grad = ctx.createLinearGradient(0, pianoY, 0, pianoY + pianoHeight);
-              grad.addColorStop(0, 'rgba(52, 211, 153, 0.2)'); // Softer hover
-              grad.addColorStop(1, 'rgba(16, 185, 129, 0.05)');
-              ctx.fillStyle = grad;
-              ctx.shadowColor = '#10b981';
-              ctx.shadowBlur = 15; // Reduced from 30
+               // Intense but transparent modern glowing emerald when pressed
+               grad.addColorStop(0, 'rgba(52, 211, 153, 0.4)');
+               grad.addColorStop(1, 'rgba(16, 185, 129, 0.6)');
             } else {
-              // Idle glassmorphism
-              ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
-              ctx.shadowBlur = 0;
+               // Premium glassmorphic frosted white
+               grad.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+               grad.addColorStop(1, 'rgba(255, 255, 255, 0.03)');
+            }
+            ctx.fillStyle = grad;
+            
+            if (isPressed) {
+                ctx.shadowColor = 'rgba(52, 211, 153, 0.6)';
+                ctx.shadowBlur = 25;
+            } else {
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
             }
             ctx.fill();
             
-            // Neon Borders
-            ctx.shadowBlur = isHovered ? 15 : 0;
-            ctx.shadowColor = '#34d399';
-            ctx.strokeStyle = isPressed ? 'rgba(255, 255, 255, 0.9)' : (isHovered ? 'rgba(52, 211, 153, 0.8)' : 'rgba(52, 211, 153, 0.2)');
-            ctx.lineWidth = isPressed ? 4 : 2;
+            // Subtle crisp border
+            ctx.strokeStyle = isPressed ? 'rgba(52, 211, 153, 0.8)' : 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
             ctx.stroke();
+
+            // Delicate hover lighting
+            if (isHovered && !isPressed) {
+               ctx.beginPath();
+               ctx.roundRect(
+                 keyX + 3, 
+                 pianoY, 
+                 keyWidth - 6, 
+                 pianoHeight - 8 + pressOffset, 
+                 [0, 0, 14, 14] 
+               );
+               ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+               ctx.fill();
+            }
+
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+          }
+
+          // Modern Glass Dark Keys
+          const hasBlackKeyAfter = [true, true, false, true, true, true, false, true, true, false];
+          const blackKeyWidth = keyWidth * 0.55;
+          const blackKeyHeight = pianoHeight * 0.55;
+
+          for (let i = 0; i < numKeys; i++) {
+            if (hasBlackKeyAfter[i]) {
+               const blackKeyX = (i + 1) * keyWidth - blackKeyWidth / 2;
+               ctx.beginPath();
+               ctx.roundRect(
+                 blackKeyX,
+                 pianoY,
+                 blackKeyWidth,
+                 blackKeyHeight,
+                 [0, 0, 8, 8]
+               );
+               
+               // Deep dark frosted glass
+               const grad = ctx.createLinearGradient(0, pianoY, 0, pianoY + blackKeyHeight);
+               grad.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+               grad.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+               ctx.fillStyle = grad;
+               
+               // Gives depth floating above the white keys
+               ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+               ctx.shadowBlur = 12;
+               ctx.shadowOffsetY = 4;
+               ctx.fill();
+
+               // Glare/reflection to look premium
+               ctx.beginPath();
+               ctx.roundRect(blackKeyX + 1, pianoY, blackKeyWidth - 2, blackKeyHeight - 4, [0,0,8,8]);
+               const highlightGrad = ctx.createLinearGradient(0, pianoY, 0, pianoY + blackKeyHeight);
+               highlightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+               highlightGrad.addColorStop(1, 'transparent');
+               ctx.fillStyle = highlightGrad;
+               ctx.fill();
+               
+               // Sharp thin border
+               ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+               ctx.lineWidth = 1;
+               ctx.stroke();
+
+               ctx.shadowColor = 'transparent';
+               ctx.shadowBlur = 0;
+               ctx.shadowOffsetY = 0;
+            }
           }
 
           // 3. Draw Ripples (Unconditionally)
