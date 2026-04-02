@@ -1,7 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { useWebcam } from '../hooks/useWebcam';
 import { useHandTracking } from '../hooks/useHandTracking';
+import { useFaceTracking } from '../hooks/useFaceTracking';
 import { synth } from '../utils/audio';
+
+const ROAST_NAMES = [
+  "Piano Specialist Jackson (Ordered from Meesho)",
+  "Walmart Beethoven",
+  "Diet Mozart",
+  "Discount Chopin",
+  "Temu Hans Zimmer",
+  "Great Value Bach",
+  "Budget Yanni",
+  "Wish.com Tchaikovsky"
+];
 
 interface FingerState {
   y: number;
@@ -20,11 +32,13 @@ interface Ripple {
 export const HandTracker = () => {
   const { videoRef, stream, error: webcamError, isLoading: webcamLoading } = useWebcam();
   const { isModelLoaded, detectHands, error: modelError } = useHandTracking();
+  const { isFaceModelLoaded, detectFaces, faceError } = useFaceTracking();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const fingerStatesRef = useRef<Record<string, FingerState>>({});
   const ripplesRef = useRef<Ripple[]>([]);
   const pressedKeysRef = useRef<Set<number>>(new Set());
+  const faceRoastMapRef = useRef<Record<number, string>>({});
 
   useEffect(() => {
     let animationFrameId: number;
@@ -282,6 +296,54 @@ export const HandTracker = () => {
             ctx.fill();
             ctx.shadowBlur = 0;
           });
+
+          // 5. Detect and Draw Faces
+          if (video && isFaceModelLoaded && video.readyState >= 2) {
+             const faceResults = detectFaces(video, performance.now());
+             if (faceResults && faceResults.detections) {
+                 faceResults.detections.forEach((detection: any, idx: number) => {
+                     if (!faceRoastMapRef.current[idx]) {
+                         faceRoastMapRef.current[idx] = ROAST_NAMES[Math.floor(Math.random() * ROAST_NAMES.length)];
+                     }
+                     const roastName = faceRoastMapRef.current[idx];
+
+                     const bbox = detection.boundingBox;
+                     if (bbox && video.videoWidth > 0 && video.videoHeight > 0) {
+                         const normX = bbox.originX / video.videoWidth;
+                         const normY = bbox.originY / video.videoHeight;
+                         const normW = bbox.width / video.videoWidth;
+                         const normH = bbox.height / video.videoHeight;
+
+                         const faceX = normX * canvas.width;
+                         const faceY = normY * canvas.height;
+                         const faceW = normW * canvas.width;
+                         const faceH = normH * canvas.height;
+
+                         ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+                         ctx.lineWidth = 2;
+                         ctx.strokeRect(faceX, faceY, faceW, faceH);
+
+                         ctx.save();
+                         const centerX = faceX + faceW / 2;
+                         ctx.translate(centerX, faceY - 15);
+                         ctx.scale(-1, 1); // Un-mirror canvas
+                         
+                         ctx.font = 'bold 16px sans-serif';
+                         ctx.textAlign = 'center';
+                         ctx.fillStyle = '#ef4444';
+                         ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                         ctx.shadowBlur = 4;
+                         ctx.fillText(roastName, 0, 0);
+                         
+                         ctx.font = '12px sans-serif';
+                         ctx.fillStyle = '#fca5a5';
+                         ctx.fillText("CRITICAL ERROR: SKILL NOT FOUND", 0, 16);
+
+                         ctx.restore();
+                     }
+                 });
+             }
+          }
         }
       }
       animationFrameId = requestAnimationFrame(renderLoop);
@@ -292,12 +354,12 @@ export const HandTracker = () => {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [isModelLoaded, detectHands, videoRef]);
+  }, [isModelLoaded, isFaceModelLoaded, detectHands, detectFaces, videoRef]);
 
-  if (webcamError || modelError) {
+  if (webcamError || modelError || faceError) {
     return (
       <div className="absolute inset-0 flex items-center justify-center p-8 bg-slate-950 z-50 text-red-400">
-        <p className="font-semibold text-2xl">{webcamError || modelError}</p>
+        <p className="font-semibold text-2xl">{webcamError || modelError || faceError}</p>
       </div>
     );
   }
@@ -316,7 +378,7 @@ export const HandTracker = () => {
         className="absolute inset-0 w-full h-full pointer-events-none transform -scale-x-100"
       />
 
-      {(!stream || !isModelLoaded) && (
+      {(!stream || !isModelLoaded || !isFaceModelLoaded) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md z-10 transition-opacity duration-500">
           <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6" />
           <p className="text-emerald-400 font-medium text-lg tracking-widest uppercase animate-pulse">
